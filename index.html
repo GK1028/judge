@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BAIUST Judging Panel v7 (Firebase)</title>
+
+<!-- TailwindCSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- SheetJS -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+<style>
+  #modalImg { transition: transform 0.25s ease; transform-origin: center center; }
+</style>
+</head>
+<body class="bg-gray-100 p-4 text-sm">
+
+<!-- LOGIN -->
+<div id="loginSection" class="max-w-md mx-auto mt-16 bg-white p-6 rounded-xl shadow">
+  <h1 class="text-2xl font-semibold text-center mb-4">Judge Login</h1>
+  <input id="judgeName" placeholder="Enter your name" class="w-full border p-2 rounded mb-3" />
+  <div class="flex gap-2">
+    <button id="loginBtn" class="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Login</button>
+    <button id="logoutBtn" class="bg-gray-200 py-2 px-3 rounded">Logout</button>
+  </div>
+</div>
+
+<!-- GALLERY -->
+<div id="gallerySection" class="hidden max-w-6xl mx-auto mt-8">
+  <div class="flex justify-between items-center mb-4">
+    <h2 class="text-2xl font-bold">Photo Gallery</h2>
+    <button id="exportBtn" class="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700">Export Excel</button>
+  </div>
+  <div id="galleryGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="fixed inset-0 bg-black bg-opacity-90 hidden z-50 flex flex-col justify-between">
+  <!-- Close button -->
+  <button id="closeModal" class="absolute top-4 right-4 text-white text-4xl font-bold z-[999] hover:text-red-500 transition">&times;</button>
+
+  <!-- Image container -->
+  <div class="flex-1 flex justify-center items-center overflow-auto p-4 relative">
+    <img id="modalImg" src="" alt="photo" class="object-contain max-w-full max-h-full rounded shadow-lg" style="transform: scale(1);" />
+    <div class="absolute top-3 left-1/2 -translate-x-1/2 flex gap-2 bg-black bg-opacity-50 p-1 rounded z-[1000]">
+      <button id="zoomOut" class="bg-gray-700 text-white px-3 py-1 rounded">-</button>
+      <button id="zoomReset" class="bg-gray-700 text-white px-3 py-1 rounded">100%</button>
+      <button id="zoomIn" class="bg-gray-700 text-white px-3 py-1 rounded">+</button>
+    </div>
+    <!-- Next/Prev Buttons -->
+    <button id="prevPhoto" class="absolute left-4 bottom-32 text-white text-3xl z-50">❮</button>
+    <button id="nextPhoto" class="absolute right-4 bottom-32 text-white text-3xl z-50">❯</button>
+  </div>
+
+  <!-- Rating/comment -->
+  <div class="bg-black bg-opacity-75 text-white p-3 flex-shrink-0">
+    <p class="font-semibold text-sm">Photo Code: <span id="modalCode"></span></p>
+    <label class="block text-sm mt-2">
+      Rate (1–20):
+      <input id="modalRating" type="number" min="1" max="20" class="ml-2 border rounded p-1 text-black w-24" />
+    </label>
+    <label class="block text-sm mt-2">Comment:
+      <textarea id="modalComment" rows="2" class="mt-1 w-full p-1 rounded text-black bg-white"></textarea>
+    </label>
+    <button id="modalSubmit" class="mt-3 w-full bg-blue-600 py-2 rounded hover:bg-blue-700">Submit</button>
+  </div>
+</div>
+
+<!-- SCRIPT -->
+<script>
+/* ===================== Firebase Setup ===================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyB4ecOybNS0h_Z3KLcdImoO87HjIfUSXLI",
+  authDomain: "judge-8bf4a.firebaseapp.com",
+  projectId: "judge-8bf4a",
+  storageBucket: "judge-8bf4a.firebasestorage.app",
+  messagingSenderId: "318486937815",
+  appId: "1:318486937815:web:49faab07d389be8692b092",
+  measurementId: "G-21V2838YTQ"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ===================== Variables ===================== */
+const photos = [
+  { code: "IP001", src: "image/IP001.jpg" },
+    { code: "IP002", src: "image/IP002.jpg" },
+    { code: "IP003", src: "image/IP003.jpg" },
+    { code: "IP004", src: "image/IP004.jpg" },
+    { code: "IP005", src: "image/IP005.jpg" },
+    { code: "IP006", src: "image/IP006.jpg" },
+    { code: "IP007", src: "image/IP007.jpg" },
+    { code: "IP008", src: "image/IP008.jpg" },
+    { code: "IP009", src: "image/IP009.jpg" },
+    { code: "IP010", src: "image/IP010.jpg" },
+    { code: "IP011", src: "image/IP011.jpg" },
+    { code: "IP012", src: "image/IP012.jpg" },
+    { code: "IP013", src: "image/IP013.jpg" },
+    { code: "IP014", src: "image/IP014.jpg" },
+    { code: "IP015", src: "image/IP015.jpg" },
+    { code: "IP016", src: "image/IP016.jpg" },
+    { code: "IP017", src: "image/IP017.jpg" },
+    { code: "IP018", src: "image/IP018.jpg" },
+    { code: "IP019", src: "image/IP019.jpg" },
+    { code: "IP020", src: "image/IP020.jpg" },
+    { code: "IP021", src: "image/IP021.jpg" },
+    { code: "IP022", src: "image/IP022.jpg" },
+    { code: "IP023", src: "image/IP023.jpg" },
+    { code: "IP024", src: "image/IP024.jpg" },
+    { code: "IP025", src: "image/IP025.jpg" },
+    { code: "IP026", src: "image/IP026.jpg" },
+    { code: "IP027", src: "image/IP027.jpg" },
+    { code: "IP028", src: "image/IP028.jpg" },
+    { code: "IP029", src: "image/IP029.jpg" },
+    { code: "IP030", src: "image/IP030.jpg" },
+    { code: "IP031", src: "image/IP031.jpg" },
+    { code: "P001", src: "image/P001.jpg" },
+    { code: "P002", src: "image/P002.jpg" },
+    { code: "P003", src: "image/P003.jpg" },
+    { code: "P004", src: "image/P004.jpg" },
+    { code: "P005", src: "image/P005.jpg" },
+    { code: "P006", src: "image/P006.jpg" },
+    { code: "P007", src: "image/P007.jpg" },
+    { code: "P008", src: "image/P008.jpg" },
+    { code: "P009", src: "image/P009.jpg" },
+    { code: "P010", src: "image/P010.jpg" },
+    { code: "P012", src: "image/P012.jpg" },
+    { code: "P013", src: "image/P013.jpg" },
+    { code: "P014", src: "image/P014.jpg" },
+    { code: "P017", src: "image/P017.jpg" },
+    { code: "P020", src: "image/P020.jpg" },
+    { code: "P021", src: "image/P021.jpg" },
+    { code: "P022", src: "image/P022.jpg" },
+    { code: "P023", src: "image/P023.jpg" },
+    { code: "P024", src: "image/P024.jpg" },
+    { code: "P025", src: "image/P025.jpg" },
+    { code: "P026", src: "image/P026.jpg" },
+    { code: "P027", src: "image/P027.jpg" },
+    { code: "P028", src: "image/P028.jpg" },
+    { code: "P030", src: "image/P030.jpg" },
+    { code: "P031", src: "image/P031.jpg" },
+    { code: "P032", src: "image/P032.jpg" },
+    { code: "P034", src: "image/P034.jpg" },
+    { code: "P035", src: "image/P035.jpg" },
+    { code: "P036", src: "image/P036.jpg" },
+    { code: "P037", src: "image/P037.jpg" },
+    { code: "P038", src: "image/P038.jpg" },
+    { code: "P039", src: "image/P039.jpg" },
+    { code: "P040", src: "image/P040.jpg" },
+    { code: "P042", src: "image/P042.jpg" },
+    { code: "P043", src: "image/P043.jpg" },
+    { code: "P044", src: "image/P044.jpg" },
+    { code: "P045", src: "image/P045.jpg" },
+    { code: "P046", src: "image/P046.jpg" },
+    { code: "P047", src: "image/P047.jpg" },
+    { code: "P048", src: "image/P048.jpg" },
+    { code: "P049", src: "image/P049.jpg" },
+    { code: "P050", src: "image/P050.jpg" },
+    { code: "P051", src: "image/P051.jpg" },
+    { code: "P052", src: "image/P052.jpg" },
+    { code: "P053", src: "image/P053.jpg" },
+    { code: "P054", src: "image/P054.jpg" },
+    { code: "P055", src: "image/P055.jpg" },
+    { code: "P056", src: "image/P056.jpg" },
+    { code: "P057", src: "image/P057.jpg" },
+    { code: "P058", src: "image/P058.jpg" },
+    { code: "P059", src: "image/P059.jpg" },
+    { code: "P060", src: "image/P060.jpg" },
+    { code: "P061", src: "image/P061.jpg" },
+    { code: "P062", src: "image/P062.jpg" },
+    { code: "P063", src: "image/P063.jpg" },
+    { code: "P064", src: "image/P064.jpg" },
+    { code: "P075", src: "image/P075.jpg" },
+    { code: "P076", src: "image/P076.jpg" },
+    { code: "P077", src: "image/P077.jpg" },
+    { code: "P078", src: "image/P078.jpg" },
+    { code: "P079", src: "image/P079.jpg" },
+    
+];
+
+const loginSection = document.getElementById('loginSection');
+const gallerySection = document.getElementById('gallerySection');
+const galleryGrid = document.getElementById('galleryGrid');
+
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+
+const modal = document.getElementById('modal');
+const modalImg = document.getElementById('modalImg');
+const modalCode = document.getElementById('modalCode');
+const modalRating = document.getElementById('modalRating');
+const modalComment = document.getElementById('modalComment');
+const modalSubmit = document.getElementById('modalSubmit');
+const closeModal = document.getElementById('closeModal');
+
+const zoomIn = document.getElementById('zoomIn');
+const zoomOut = document.getElementById('zoomOut');
+const zoomReset = document.getElementById('zoomReset');
+
+const prevPhotoBtn = document.getElementById('prevPhoto');
+const nextPhotoBtn = document.getElementById('nextPhoto');
+
+const exportBtn = document.getElementById('exportBtn');
+
+let activeJudge = localStorage.getItem('activeJudge') || null;
+let currentPhoto = null;
+let currentIndex = 0;
+let scale = 1;
+
+/* ===================== Gallery Render ===================== */
+function renderGallery() {
+  galleryGrid.innerHTML = '';
+  photos.forEach((p, idx) => {
+    const item = document.createElement('div');
+    item.className = 'bg-white rounded shadow overflow-hidden cursor-pointer hover:scale-105 transform transition';
+    item.dataset.code = p.code;
+    item.dataset.src = p.src;
+    item.innerHTML = `
+      <img src="${p.src}" class="w-full h-48 object-cover" alt="${p.code}" onerror="this.style.opacity=.4" />
+      <div class="p-2"><p class="font-semibold">${p.code}</p></div>
+    `;
+    item.addEventListener('click', () => openModalByIndex(idx));
+    galleryGrid.appendChild(item);
+  });
+}
+
+/* ===================== Open Modal ===================== */
+function openModalByIndex(index){
+  if(!activeJudge){ alert('Please login first'); return; }
+  currentIndex = index;
+  const p = photos[currentIndex];
+  currentPhoto = { code: p.code, src: p.src };
+  modalImg.src = currentPhoto.src;
+  modalCode.textContent = currentPhoto.code;
+  modalRating.value = '';
+  modalComment.value = '';
+  scale = 1;
+  modalImg.style.transform = `scale(${scale})`;
+  modal.classList.remove('hidden');
+  setTimeout(()=> window.scrollTo(0,0), 0);
+}
+
+/* ===================== Submit Ratings ===================== */
+modalSubmit.addEventListener('click', async () => {
+  const rating = parseInt(modalRating.value);
+  const comment = modalComment.value || '';
+  if(!rating || rating<1 || rating>20){ alert('Rate 1-20'); return; }
+  await db.collection('ratings').add({
+    judge: activeJudge,
+    photoCode: currentPhoto.code,
+    rating,
+    comment,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  alert('Saved to Firebase!');
+  modal.classList.add('hidden');
+});
+
+/* ===================== Modal Controls ===================== */
+closeModal.addEventListener('click', e=>{ e.stopPropagation(); modal.classList.add('hidden'); });
+modal.addEventListener('click', e=>{ if(e.target===modal) modal.classList.add('hidden'); });
+
+zoomIn.addEventListener('click', ()=>{ scale=+(scale+0.1).toFixed(2); modalImg.style.transform=`scale(${scale})`; });
+zoomOut.addEventListener('click', ()=>{ scale=Math.max(0.1, +(scale-0.1).toFixed(2)); modalImg.style.transform=`scale(${scale})`; });
+zoomReset.addEventListener('click', ()=>{ scale=1; modalImg.style.transform=`scale(${scale})`; });
+
+document.addEventListener('keydown', (e)=>{
+  if(modal.classList.contains('hidden')) return;
+    if(e.key==='ArrowRight'){ 
+    currentIndex=(currentIndex+1)%photos.length; 
+    openModalByIndex(currentIndex); 
+  } else if(e.key==='ArrowLeft'){ 
+    currentIndex=(currentIndex-1+photos.length)%photos.length; 
+    openModalByIndex(currentIndex); 
+  } else if(e.key==='Escape'){
+    modal.classList.add('hidden');
+  }
+});
+
+// Next/Prev buttons
+nextPhotoBtn.addEventListener('click', ()=>{
+  currentIndex=(currentIndex+1)%photos.length;
+  openModalByIndex(currentIndex);
+});
+prevPhotoBtn.addEventListener('click', ()=>{
+  currentIndex=(currentIndex-1+photos.length)%photos.length;
+  openModalByIndex(currentIndex);
+});
+
+// Login / Logout
+loginBtn.addEventListener('click', ()=>{
+  const nm=document.getElementById('judgeName').value.trim();
+  if(!nm){ alert('Enter your name'); return; }
+  activeJudge=nm;
+  localStorage.setItem('activeJudge', activeJudge);
+  loginSection.classList.add('hidden');
+  gallerySection.classList.remove('hidden');
+});
+logoutBtn.addEventListener('click', ()=>{
+  localStorage.removeItem('activeJudge');
+  activeJudge=null;
+  loginSection.classList.remove('hidden');
+  gallerySection.classList.add('hidden');
+});
+
+// Export Excel (Admin)
+exportBtn.addEventListener('click', async ()=>{
+  const snapshot = await db.collection('ratings').get();
+  const ratings = snapshot.docs.map(doc=>doc.data());
+  if(ratings.length===0){ alert('No ratings to export'); return; }
+
+  const ws_data=[['Judge','Photo Code','Rating','Comment','Timestamp']];
+  ratings.forEach(r=>{
+    ws_data.push([r.judge,r.photoCode,r.rating,r.comment,r.timestamp?.toDate()]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ratings');
+  XLSX.writeFile(wb,'BAIUST_Ratings.xlsx');
+});
+
+/* ===================== Init ===================== */
+(function init(){
+  renderGallery();
+  if(activeJudge){
+    loginSection.classList.add('hidden');
+    gallerySection.classList.remove('hidden');
+  }
+})();
+</script>
+</body>
+</html>
+
